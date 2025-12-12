@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 pub type ClientId = u16;
@@ -10,8 +10,8 @@ pub type TransactionId = u32;
 /// Note that we don't store the common fields like client and tx here
 #[derive(Debug)]
 pub enum Transaction {
-    Deposit (Decimal),
-    Withdrawal (Decimal),
+    Deposit(Decimal),
+    Withdrawal(Decimal),
     Dispute,
     Resolve,
     Chargeback,

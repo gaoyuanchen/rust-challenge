@@ -1,18 +1,26 @@
+use crate::types::{
+    AccountProfile, CsvInputRow, Transaction, TransactionId, TransactionParsingError,
+    TransactionProcessingError, TransactionState,
+};
 use rust_decimal::Decimal;
-use crate::types::{AccountProfile, CsvInputRow, Transaction, TransactionId, TransactionParsingError, TransactionProcessingError, TransactionState};
 
 impl AccountProfile {
     /// The main handler for transaction
     /// When we accept a transaction, we will return Ok(()) and mutate the state of `AccountProfile`
     /// When we reject a transaction, we will return Err with TransactionProcessingError
-    pub fn process_transaction(&mut self, id: TransactionId, transaction: Transaction) -> Result<(), TransactionProcessingError> {
+    pub fn process_transaction(
+        &mut self,
+        id: TransactionId,
+        transaction: Transaction,
+    ) -> Result<(), TransactionProcessingError> {
         if self.frozen {
             return Err(TransactionProcessingError::AccountIsFrozen);
         }
         match transaction {
             Transaction::Deposit(amount) => {
                 self.validate_unique_id(id)?;
-                self.deposit_transactions.insert(id, (TransactionState::Normal, amount));
+                self.deposit_transactions
+                    .insert(id, (TransactionState::Normal, amount));
                 self.available += amount;
             }
             Transaction::Withdrawal(amount) => {
@@ -20,7 +28,10 @@ impl AccountProfile {
                 // Note that even if the withdrawal was rejected due to other reason, we still consume this ID
                 self.validate_unique_id(id)?;
                 if self.available < amount {
-                    return Err(TransactionProcessingError::AvailableAmountTooLow(self.available, amount));
+                    return Err(TransactionProcessingError::AvailableAmountTooLow(
+                        self.available,
+                        amount,
+                    ));
                 }
                 self.available -= amount;
             }
@@ -33,7 +44,9 @@ impl AccountProfile {
                 // This is a special case where the user already withdrawal the fund
                 // The instruction didn't mention how to handle this case, here I assume we need to reject this dispute
                 if available < amount {
-                    return Err(TransactionProcessingError::AvailableAmountTooLow(available, amount));
+                    return Err(TransactionProcessingError::AvailableAmountTooLow(
+                        available, amount,
+                    ));
                 }
                 *state = TransactionState::UnderDispute;
                 self.available -= amount;
@@ -61,7 +74,10 @@ impl AccountProfile {
         Ok(())
     }
 
-    fn get_deposit_transaction(&mut self, id: TransactionId) -> Result<(&mut TransactionState, Decimal), TransactionProcessingError> {
+    fn get_deposit_transaction(
+        &mut self,
+        id: TransactionId,
+    ) -> Result<(&mut TransactionState, Decimal), TransactionProcessingError> {
         match self.deposit_transactions.get_mut(&id) {
             None => Err(TransactionProcessingError::InvalidTransactionId(id)),
             Some((state, amount)) => Ok((state, *amount)),
@@ -79,8 +95,12 @@ impl AccountProfile {
 
 pub fn parse_transaction(row: &CsvInputRow) -> Result<Transaction, TransactionParsingError> {
     match row.transaction_type.as_str() {
-        "deposit" => Ok(Transaction::Deposit(row.amount.ok_or(TransactionParsingError::MissingAmount)?)),
-        "withdrawal" => Ok(Transaction::Withdrawal(row.amount.ok_or(TransactionParsingError::MissingAmount)?)),
+        "deposit" => Ok(Transaction::Deposit(
+            row.amount.ok_or(TransactionParsingError::MissingAmount)?,
+        )),
+        "withdrawal" => Ok(Transaction::Withdrawal(
+            row.amount.ok_or(TransactionParsingError::MissingAmount)?,
+        )),
         "dispute" => Ok(Transaction::Dispute),
         "resolve" => Ok(Transaction::Resolve),
         "chargeback" => Ok(Transaction::Chargeback),
@@ -126,7 +146,10 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(profile.available, Decimal::from(3));
         assert_eq!(profile.held, Decimal::from(10));
-        assert_eq!(profile.deposit_transactions.get(&1).unwrap().0, TransactionState::UnderDispute);
+        assert_eq!(
+            profile.deposit_transactions.get(&1).unwrap().0,
+            TransactionState::UnderDispute
+        );
         assert_eq!(profile.frozen, false);
 
         let res = profile.process_transaction(1, Transaction::Dispute);
@@ -139,7 +162,10 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(profile.available, Decimal::from(13));
         assert_eq!(profile.held, Decimal::from(0));
-        assert_eq!(profile.deposit_transactions.get(&1).unwrap().0, TransactionState::Normal);
+        assert_eq!(
+            profile.deposit_transactions.get(&1).unwrap().0,
+            TransactionState::Normal
+        );
         assert_eq!(profile.frozen, false);
 
         let res = profile.process_transaction(1, Transaction::Resolve);
@@ -150,14 +176,20 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(profile.available, Decimal::from(8));
         assert_eq!(profile.held, Decimal::from(5));
-        assert_eq!(profile.deposit_transactions.get(&2).unwrap().0, TransactionState::UnderDispute);
+        assert_eq!(
+            profile.deposit_transactions.get(&2).unwrap().0,
+            TransactionState::UnderDispute
+        );
         assert_eq!(profile.frozen, false);
 
         let res = profile.process_transaction(2, Transaction::Chargeback);
         assert!(res.is_ok());
         assert_eq!(profile.available, Decimal::from(8));
         assert_eq!(profile.held, Decimal::from(0));
-        assert_eq!(profile.deposit_transactions.get(&2).unwrap().0, TransactionState::Chargeback);
+        assert_eq!(
+            profile.deposit_transactions.get(&2).unwrap().0,
+            TransactionState::Chargeback
+        );
         assert_eq!(profile.frozen, true);
 
         let res = profile.process_transaction(4, Transaction::Deposit(Decimal::from(20)));
