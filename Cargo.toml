@@ -1,0 +1,10 @@
+[package]
+name = "rust-challenge"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+csv = "1.4.0"
+rust_decimal = "1.39.0"
+thiserror = "2.0.17"
